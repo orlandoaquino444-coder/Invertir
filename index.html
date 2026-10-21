@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EUR/USD Quant Analyzer Pro</title>
+<script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0b1220;color:#e7eef9;font:14px system-ui,Arial}
+header{padding:16px;background:#111d30;border-bottom:1px solid #30415c}h1{font-size:23px;margin:0}main{max-width:1400px;margin:auto;padding:14px}
+.grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:12px}.card{background:#121d30;border:1px solid #2c3d57;border-radius:12px;padding:14px;min-width:0}
+.w12{grid-column:span 12}.w6{grid-column:span 6}.w4{grid-column:span 4}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+.field{display:flex;flex-direction:column;gap:4px;flex:1;min-width:110px}label,small,.muted{color:#9db0c9}input,select,button{background:#0b1628;color:#e7eef9;border:1px solid #354966;border-radius:7px;padding:9px;font:inherit;min-width:0}
+button{cursor:pointer}button.primary{background:#12674f}#chart{height:410px}#rsi{height:140px}.metric{font-size:22px;font-weight:bold}.green{color:#35d69a}.red{color:#ff7283}.gold{color:#f5c66b}
+table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:7px;border-bottom:1px solid #2c3d57;text-align:left}th{color:#9db0c9}.scroll{overflow:auto;max-height:280px}
+.note{padding:10px;border-left:3px solid #e9b955;background:#292619;margin-bottom:12px}.pill{display:inline-block;padding:4px 8px;border:1px solid #354966;border-radius:30px;font-size:12px}
+@media(max-width:800px){.w6,.w4{grid-column:span 12}#chart{height:330px}}
+</style>
+</head>
+<body>
+<header><h1>EUR/USD · Quant Analyzer Pro</h1><small>Gráfico, indicadores técnicos, riesgo y pruebas históricas</small></header>
+<main>
+<div class="note">Herramienta de análisis, no asesoramiento financiero. No garantiza beneficios ni ejecuta órdenes. El streaming depende de tu plan Twelve Data y de sus permisos de acceso.</div>
+<div class="grid">
+<section class="card w12">
+<h2>Gráfico de mercado</h2>
+<div class="row">
+<div class="field"><label>Par</label><input value="EUR/USD" disabled></div>
+<div class="field"><label>Temporalidad</label><select id="tf"><option value="1min">1 minuto</option><option value="5min">5 minutos</option><option value="10min">10 minutos</option><option value="1h">1 hora</option><option value="10h">10 horas</option><option value="1day">1 día</option></select></div>
+<div class="field"><label>Velas</label><select id="count"><option>100</option><option selected>250</option><option>500</option><option>1000</option></select></div>
+<button id="load" class="primary">Cargar datos</button><button id="live">Conectar streaming</button><button id="pause">Pausar</button>
+</div>
+<p><span id="status" class="pill">Iniciando…</span> <span id="price">Precio: —</span> <span id="updated" class="muted"></span></p>
+<div id="chart"></div><p class="muted">EMA20 · EMA50 · EMA200 · Bandas de Bollinger</p><h3>RSI 14</h3><div id="rsi"></div>
+</section>
+<section class="card w4"><h2>Señal técnica</h2><div id="signal" class="metric gold">ESPERANDO DATOS</div><p id="score" class="muted">La puntuación no es una probabilidad de ganar.</p><p id="reason" class="muted"></p></section>
+<section class="card w4"><h2>Indicadores</h2><table><tbody id="indicators"></tbody></table></section>
+<section class="card w4"><h2>Niveles calculados</h2><table><tbody id="levels"></tbody></table></section>
+<section class="card w6">
+<h2>Calculadora de riesgo</h2><div class="row">
+<div class="field"><label>Capital USD</label><input id="capital" type="number" value="1000" min="1"></div>
+<div class="field"><label>Riesgo (%)</label><input id="risk" type="number" value="1" min=".1" max="5" step=".1"></div>
+<div class="field"><label>Stop ATR ×</label><input id="atrMult" type="number" value="1.5" min=".5" step=".1"></div>
+<div class="field"><label>Riesgo/beneficio</label><input id="rr" type="number" value="2" min=".5" step=".25"></div>
+<div class="field"><label>Spread (pips)</label><input id="spread" type="number" value="1.2" min="0" step=".1"></div>
+</div><button id="calcRisk" class="primary">Calcular</button><p id="riskResult" class="muted">Carga datos primero.</p>
+</section>
+<section class="card w6"><h2>Backtesting simplificado</h2><div class="row">
+<div class="field"><label>Confluencia mínima</label><input id="btThreshold" type="number" value="2.5" step=".5"></div>
+<div class="field"><label>Stop ATR ×</label><input id="btAtr" type="number" value="1.5" step=".1"></div>
+<div class="field"><label>Objetivo R:R</label><input id="btRR" type="number" value="2" step=".25"></div>
+</div><button id="backtest" class="primary">Ejecutar backtest</button><div id="btResult" class="muted">Carga suficientes velas para probar.</div></section>
+<section class="card w12"><h2>Historial manual de operaciones</h2><div class="row">
+<div class="field"><label>Dirección</label><select id="dir"><option>BUY</option><option>SELL</option></select></div>
+<div class="field"><label>Entrada</label><input id="entry" type="number" step=".00001"></div><div class="field"><label>Salida</label><input id="exit" type="number" step=".00001"></div>
+<div class="field"><label>Unidades EUR</label><input id="units" type="number" value="1000" min="1"></div><div class="field"><label>Nota</label><input id="note"></div><button id="save">Guardar</button><button id="clear">Borrar historial</button>
+</div><div class="scroll"><table><thead><tr><th>Fecha</th><th>Dirección</th><th>Entrada</th><th>Salida</th><th>Unidades</th><th>P/L USD aprox.</th><th>Nota</th></tr></thead><tbody id="history"></tbody></table></div><p id="total" class="muted"></p></section>
+<section class="card w12"><h2>Registro técnico</h2><pre id="log" style="white-space:pre-wrap;overflow:auto;max-height:150px" class="muted"></pre></section>
+</div>
+<p class="muted">No se conecta a tu bróker. Comprueba el valor del pip, spread, comisiones, margen y reglas de ejecución antes de operar.</p>
+</main>
+<script>
+(()=>{"use strict";
+const $=id=>document.getElementById(id);let bars=[],chart,candles,ema20s,ema50s,ema200s,upperS,lowerS,rchart,rsis,ws=null,poll=null,paused=false;
+function log(s){$("log").textContent=new Date().toLocaleTimeString()+" "+s+"\n"+$("log").textContent}
+function status(s){$("status").textContent=s}function f(n,d=5){return Number.isFinite(n)?n.toFixed(d):"—"}function avg(a){return a.length?a.reduce((x,y)=>x+y,0)/a.length:NaN}
+function init(){if(!window.LightweightCharts){status("No cargó la librería de gráficos");return}
+const base={layout:{background:{type:"solid",color:"#121d30"},textColor:"#cbd5e1"},grid:{vertLines:{color:"#25344a"},horzLines:{color:"#25344a"}},rightPriceScale:{borderColor:"#354966"},timeScale:{timeVisible:true,borderColor:"#354966"}};
+chart=LightweightCharts.createChart($("chart"),{...base,height:410});candles=chart.addCandlestickSeries({upColor:"#25c58a",downColor:"#ff6174",borderUpColor:"#25c58a",borderDownColor:"#ff6174",wickUpColor:"#25c58a",wickDownColor:"#ff6174"});
+ema20s=chart.addLineSeries({color:"#f6bd60",lineWidth:1});ema50s=chart.addLineSeries({color:"#60a5fa",lineWidth:1});ema200s=chart.addLineSeries({color:"#c084fc",lineWidth:1});upperS=chart.addLineSeries({color:"#2dd4bf",lineStyle:2,lineWidth:1});lowerS=chart.addLineSeries({color:"#2dd4bf",lineStyle:2,lineWidth:1});
+rchart=LightweightCharts.createChart($("rsi"),{...base,height:140});rsis=rchart.addLineSeries({color:"#c084fc",lineWidth:2});
+window.addEventListener("resize",()=>{chart.applyOptions({width:$("chart").clientWidth});rchart.applyOptions({width:$("rsi").clientWidth})})}
+function ema(a,n){let o=Array(a.length).fill(null);if(a.length<n)return o;let v=avg(a.slice(0,n));o[n-1]=v;const k=2/(n+1);for(let i=n;i<a.length;i++){v=a[i]*k+v*(1-k);o[i]=v}return o}
+function rsi(a,n=14){let o=Array(a.length).fill(null);if(a.length<=n)return o;let g=0,l=0;for(let i=1;i<=n;i++){let d=a[i]-a[i-1];g+=Math.max(d,0);l+=Math.max(-d,0)}g/=n;l/=n;o[n]=l===0?100:100-100/(1+g/l);for(let i=n+1;i<a.length;i++){let d=a[i]-a[i-1];g=(g*(n-1)+Math.max(d,0))/n;l=(l*(n-1)+Math.max(-d,0))/n;o[i]=l===0?100:100-100/(1+g/l)}return o}
+function atr(a,n=14){let tr=a.map((b,i)=>i===0?b.high-b.low:Math.max(b.high-b.low,Math.abs(b.high-a[i-1].close),Math.abs(b.low-a[i-1].close)));let o=Array(a.length).fill(null);if(a.length<=n)return o;let v=avg(tr.slice(1,n+1));o[n]=v;for(let i=n+1;i<a.length;i++){v=(v*(n-1)+tr[i])/n;o[i]=v}return o}
+function macd(a){let x=ema(a,12),y=ema(a,26),m=a.map((_,i)=>x[i]!=null&&y[i]!=null?x[i]-y[i]:null),signal=Array(a.length).fill(null),first=m.findIndex(v=>v!=null);if(first>=0){let e=ema(m.slice(first),9);e.forEach((v,j)=>{if(v!=null)signal[first+j]=v})}return{m,signal}}
+function bb(a,n=20){let mid=Array(a.length).fill(null),up=[...mid],lo=[...mid];for(let i=n-1;i<a.length;i++){let v=a.slice(i-n+1,i+1),m=avg(v),sd=Math.sqrt(avg(v.map(x=>(x-m)**2)));mid[i]=m;up[i]=m+2*sd;lo[i]=m-2*sd}return{mid,up,lo}}
+function adx(a,n=14){let p=Array(a.length).fill(null),m=Array(a.length).fill(null),out=Array(a.length).fill(null);if(a.length<2*n+1)return{p,m,out};let tr=[],pd=[],md=[];for(let i=1;i<a.length;i++){let u=a[i].high-a[i-1].high,d=a[i-1].low-a[i].low;pd.push(u>d&&u>0?u:0);md.push(d>u&&d>0?d:0);tr.push(Math.max(a[i].high-a[i].low,Math.abs(a[i].high-a[i-1].close),Math.abs(a[i].low-a[i-1].close)))}let st=tr.slice(0,n).reduce((x,y)=>x+y,0),sp=pd.slice(0,n).reduce((x,y)=>x+y,0),sm=md.slice(0,n).reduce((x,y)=>x+y,0),dx=[];for(let i=n;i<tr.length;i++){if(i>n){st+=tr[i]-st/n;sp+=pd[i]-sp/n;sm+=md[i]-sm/n}let pi=st?100*sp/st:0,mi=st?100*sm/st:0;p[i+1]=pi;m[i+1]=mi;dx.push({i:i+1,v:pi+mi?100*Math.abs(pi-mi)/(pi+mi):0})}if(dx.length>=n){let v=avg(dx.slice(0,n).map(x=>x.v));out[dx[n-1].i]=v;for(let j=n;j<dx.length;j++){v=(v*(n-1)+dx[j].v)/n;out[dx[j].i]=v}}return{p,m,out}}
+function calc(a){let c=a.map(x=>x.close);return{c,e20:ema(c,20),e50:ema(c,50),e200:ema(c,200),rsi:rsi(c),atr:atr(a),macd:macd(c),bb:bb(c),adx:adx(a)}}
+function aggregate(a,minutes){let o=[];for(const b of a){let t=Math.floor(b.time/(minutes*60))*(minutes*60),z=o[o.length-1];if(!z||z.time!==t)o.push({time:t,open:b.open,high:b.high,low:b.low,close:b.close});else{z.high=Math.max(z.high,b.high);z.low=Math.min(z.low,b.low);z.close=b.close}}return o}
+function apiInterval(){let t=$("tf").value;return t==="10min"?"5min":t==="10h"?"1h":t}
+function shape(a){let t=$("tf").value;return t==="10min"?aggregate(a,10):t==="10h"?aggregate(a,600):a}
+async function fetchBars(int=apiInterval(),size=+$("count").value){let u="/api/time_series?symbol=EUR%2FUSD&interval="+encodeURIComponent(int)+"&outputsize="+Math.min(5000,size);let r=await fetch(u,{cache:"no-store"}),j=await r.json();if(!r.ok||j.status==="error"||!j.values)throw Error(j.error||j.message||"No se pudieron recibir datos");return j.values.map(v=>({time:Math.floor(new Date(v.datetime.replace(" ","T")+"Z").getTime()/1000),open:+v.open,high:+v.high,low:+v.low,close:+v.close})).filter(b=>Number.isFinite(b.close)&&Number.isFinite(b.time)).sort((a,b)=>a.time-b.time)}
+async function load(){stopLive();status("Cargando datos…");try{let tf=$("tf").value,need=tf==="10min"?+$("count").value*2:tf==="10h"?+$("count").value*10:+$("count").value;bars=shape(await fetchBars(apiInterval(),need)).slice(-+$("count").value);if(!bars.length)throw Error("No hay velas disponibles");render();status("Datos históricos cargados");log("Velas cargadas: "+bars.length);startPoll()}catch(e){status("Error de datos");log(e.message)}}
+function points(arr){return arr.map((v,i)=>v==null?null:{time:bars[i].time,value:v}).filter(Boolean)}
+function render(){if(!bars.length)return;let x=calc(bars),k=bars.length-1,b=bars[k];candles.setData(bars);ema20s.setData(points(x.e20));ema50s.setData(points(x.e50));ema200s.setData(points(x.e200));upperS.setData(points(x.bb.up));lowerS.setData(points(x.bb.lo));rsis.setData(points(x.rsi));chart.timeScale().fitContent();rchart.timeScale().fitContent();$("price").textContent="Precio: "+f(b.close);$("updated").textContent=" · "+new Date().toLocaleTimeString();analyze(x)}
+function analyze(x){let k=bars.length-1,p=x.c[k],r=x.rsi[k],a=x.atr[k],m=x.macd.m[k],ms=x.macd.signal[k],adxv=x.adx.out[k],s=0,why=[];
+if(x.e20[k]!=null&&x.e50[k]!=null){if(p>x.e20[k]&&x.e20[k]>x.e50[k]){s++;why.push("Tendencia EMA alcista")}else if(p<x.e20[k]&&x.e20[k]<x.e50[k]){s--;why.push("Tendencia EMA bajista")}}
+if(x.e200[k]!=null)s+=p>x.e200[k]?.5:-.5;
+if(r>50&&r<70){s++;why.push("RSI con impulso alcista")}else if(r<50&&r>30){s--;why.push("RSI con impulso bajista")}else if(r>=70)why.push("RSI alto: posible sobrecompra");else if(r<=30)why.push("RSI bajo: posible sobreventa");
+if(m!=null&&ms!=null)s+=m>ms?1:-1;if(adxv>20)s+=x.adx.p[k]>x.adx.m[k]?.5:-.5;
+let dir=s>=2.5?1:s<=-2.5?-1:0;$("signal").textContent=dir===1?"POSIBLE COMPRA":dir===-1?"POSIBLE VENTA":"ESPERAR";$("signal").className="metric "+(dir===1?"green":dir===-1?"red":"gold");$("score").textContent="Confluencia "+s.toFixed(1)+" · no es probabilidad estadística de éxito.";$("reason").textContent=why.join(" · ")||"Indicadores insuficientes.";
+let rows=[["EMA20",x.e20[k]],["EMA50",x.e50[k]],["EMA200",x.e200[k]],["RSI14",r],["MACD",m],["Señal MACD",ms],["ATR14",a],["ADX14",adxv],["+DI",x.adx.p[k]],["−DI",x.adx.m[k]],["Bollinger superior",x.bb.up[k]],["Bollinger inferior",x.bb.lo[k]]];$("indicators").innerHTML=rows.map(v=>`<tr><td>${v[0]}</td><td>${f(v[1],6)}</td></tr>`).join("");
+let dist=a*(+$("atrMult").value||1.5),rr=+$("rr").value||2,spread=(+$("spread").value||0)*.0001;$("levels").innerHTML=[["Sesgo",dir===1?"Compra":dir===-1?"Venta":"Sin señal"],["Precio referencia",f(p)],["Stop estimado",f(dir?p-dir*(dist+spread):NaN)],["Objetivo estimado",f(dir?p+dir*dist*rr:NaN)],["Distancia ATR",f(dist,6)]].map(v=>`<tr><td>${v[0]}</td><td>${v[1]}</td></tr>`).join("")}
+function riskCalc(){if(!bars.length)return;let a=calc(bars).atr.at(-1),capital=+$("capital").value,pct=+$("risk").value,dist=a*(+$("atrMult").value||1.5)+(+$("spread").value||0)*.0001;if(!(capital>0&&pct>0&&dist>0))return $("riskResult").textContent="Revisa capital y riesgo.";let money=capital*pct/100,units=Math.floor(money/dist);$("riskResult").innerHTML=`Riesgo teórico: <b>$${money.toFixed(2)}</b><br>Stop estimado: <b>${f(dist,6)}</b><br>Unidades aproximadas: <b>${units.toLocaleString()} EUR</b> (${(units/100000).toFixed(3)} lotes estándar).<br><small>Estimación simplificada; confirma pip, margen y costes con tu bróker.</small>`}
+function backtest(){if(bars.length<250)return $("btResult").textContent="Carga al menos 250 velas. Para una prueba seria necesitas más datos.";let x=calc(bars),trades=[],eq=0,peak=0,dd=0,min=+$("btThreshold").value,sm=+$("btAtr").value,rr=+$("btRR").value;
+for(let i=205;i<bars.length-2;i++){let r=x.rsi[i],a=x.atr[i],m=x.macd.m[i],ms=x.macd.signal[i],p=bars[i].close;if(!Number.isFinite(r)||!Number.isFinite(a)||!Number.isFinite(m)||!Number.isFinite(ms))continue;let s=0;if(x.e20[i]!=null&&x.e50[i]!=null)s+=(p>x.e20[i]&&x.e20[i]>x.e50[i])?1:(p<x.e20[i]&&x.e20[i]<x.e50[i]?-1:0);if(x.e200[i]!=null)s+=p>x.e200[i]?.5:-.5;if(r>50&&r<70)s++;else if(r<50&&r>30)s--;s+=m>ms?1:-1;if(x.adx.out[i]>20)s+=x.adx.p[i]>x.adx.m[i]?.5:-.5;let d=s>=min?1:s<=-min?-1:0;if(!d)continue;let entry=bars[i+1].open,dist=a*sm,sl=entry-d*dist,tp=entry+d*dist*rr,outcome=null;
+for(let j=i+1;j<Math.min(bars.length,i+50);j++){let b=bars[j],hitSL=d===1?b.low<=sl:b.high>=sl,hitTP=d===1?b.high>=tp:b.low<=tp;if(hitSL){outcome=-1;break}if(hitTP){outcome=rr;break}}
+if(outcome===null)outcome=d*(bars[Math.min(bars.length-1,i+49)].close-entry)/dist;trades.push(outcome);eq+=outcome;peak=Math.max(peak,eq);dd=Math.max(dd,peak-eq);i++}
+let wins=trades.filter(v=>v>0),loss=trades.filter(v=>v<=0),gp=wins.reduce((a,b)=>a+b,0),gl=Math.abs(loss.reduce((a,b)=>a+b,0)),wr=trades.length?100*wins.length/trades.length:0,pf=gl?gp/gl:Infinity,ex=trades.length?eq/trades.length:0;
+$("btResult").innerHTML=`<p><b>${trades.length}</b> operaciones simuladas</p><p>Acierto histórico: <b>${wr.toFixed(1)}%</b></p><p>Profit factor: <b>${Number.isFinite(pf)?pf.toFixed(2):"∞"}</b></p><p>Expectativa: <b>${ex.toFixed(2)} R</b> por operación</p><p>Resultado: <b>${eq.toFixed(2)} R</b> · Drawdown máximo: <b>${dd.toFixed(2)} R</b></p><small>Prueba simplificada, no validada de forma independiente; no predice resultados futuros.</small>`}
+function connectLive(){stopLive();paused=false;let proto=location.protocol==="https:"?"wss:":"ws:";ws=new WebSocket(proto+"//"+location.host+"/live");ws.onopen=()=>{ws.send(JSON.stringify({action:"subscribe",params:{symbols:"EUR/USD"}}));status("Solicitud de streaming enviada")};ws.onmessage=ev=>{let m;try{m=JSON.parse(ev.data)}catch(_){return}if(m.type==="error"||m.event==="error"){log("Streaming: "+(m.message||JSON.stringify(m)));return}if(m.event==="price"&&Number.isFinite(+m.price))tick(+m.price,+(m.timestamp||Date.now()/1000));else if(m.type==="connection")status("WebSocket: "+m.status)};ws.onerror=()=>{status("Error de streaming");log("Comprueba acceso WebSocket y plan de Twelve Data.")}}
+function tick(price,t){if(!bars.length||paused)return;let tf=$("tf").value,sec=tf==="1min"?60:tf==="5min"?300:tf==="10min"?600:tf==="1h"?3600:tf==="10h"?36000:86400,bucket=Math.floor(t/sec)*sec,last=bars[bars.length-1];if(bucket<last.time)return;if(bucket===last.time){last.high=Math.max(last.high,price);last.low=Math.min(last.low,price);last.close=price}else{bars.push({time:bucket,open:last.close,high:Math.max(last.close,price),low:Math.min(last.close,price),close:price});if(bars.length>+$("count").value)bars.shift()}render();status("Cotización recibida")}
+function stopLive(){if(ws){try{ws.close()}catch(_){}ws=null}clearInterval(poll)}
+function startPoll(){clearInterval(poll);if(paused)return;poll=setInterval(async()=>{if(paused||document.hidden)return;try{let raw=await fetchBars(apiInterval(),100),fresh=shape(raw);if(fresh.length){bars=fresh.slice(-+$("count").value);render();status("Actualizado por consulta API")}}catch(e){log("Actualización: "+e.message)}},60000)}
+function getHistory(){try{return JSON.parse(localStorage.getItem("eurusd-history")||"[]")}catch(_){return[]}}
+function drawHistory(){let h=getHistory();$("history").innerHTML=h.map(t=>`<tr><td>${new Date(t.date).toLocaleString()}</td><td>${t.dir}</td><td>${f(t.entry)}</td><td>${f(t.exit)}</td><td>${t.units}</td><td>${t.pnl.toFixed(2)}</td><td>${String(t.note).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}</td></tr>`).join("");$("total").textContent=`${h.length} operaciones · P/L aproximado: $${h.reduce((a,t)=>a+t.pnl,0).toFixed(2)}`}
+$("load").onclick=load;$("live").onclick=()=>{connectLive();startPoll()};$("pause").onclick=()=>{paused=!paused;if(paused){stopLive();status("Actualizaciones pausadas");$("pause").textContent="Reanudar"}else{$("pause").textContent="Pausar";connectLive();startPoll()}};$("tf").onchange=load;$("count").onchange=load;$("calcRisk").onclick=riskCalc;$("backtest").onclick=backtest;
+$("save").onclick=()=>{let dir=$("dir").value,entry=+$("entry").value,exit=+$("exit").value,units=+$("units").value;if(!(entry>0&&exit>0&&units>0))return alert("Introduce entrada, salida y unidades válidas.");let h=getHistory();h.unshift({date:new Date().toISOString(),dir,entry,exit,units,pnl:(dir==="BUY"?exit-entry:entry-exit)*units,note:$("note").value});localStorage.setItem("eurusd-history",JSON.stringify(h));drawHistory()};
+$("clear").onclick=()=>{if(confirm("¿Borrar historial local?")){localStorage.removeItem("eurusd-history");drawHistory()}};init();drawHistory();load();
+})();
+</script>
+</body>
+</html>
